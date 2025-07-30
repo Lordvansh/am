@@ -35,8 +35,8 @@ def get_token(card, month, year, cvv, zip_code, name):
     payload = {
         "securePaymentContainerRequest": {
             "merchantAuthentication": {
-                "name": "3c5Q9QdJW",
-                "clientKey": "2n7ph2Zb4HBkJkb8byLFm7stgbfd8k83mSPWLW23uF4g97rX5pRJNgbyAe2vAvQu"
+                "name": "3c5Q9QdJW",  # updated token name
+                "clientKey": "2n7ph2Zb4HBkJkb8byLFm7stgbfd8k83mSPWLW23uF4g97rX5pRJNgbyAe2vAvQu"  # updated token key
             },
             "data": {
                 "type": "TOKEN",
