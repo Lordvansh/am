@@ -124,17 +124,25 @@ def process():
     try:
         token = get_token(card, mm, yy, cvv)
     except Exception as e:
-        return jsonify({"error": "Token generation failed", "detail": str(e)}), 500
+        return jsonify({"success": False, "message": "Token generation failed", "detail": str(e)}), 500
 
     message = send_to_checkout(token, mm, yy, name, email, phone, address, city, state, postal)
     time_taken = round(time.time() - start_time, 3)
 
+    # --- Detect success or decline ---
+    if "Your Payment is Successfully Done" in message:
+        success = True
+        short_msg = "Payment is Successfully Done."
+    else:
+        success = False
+        short_msg = "This transaction has been declined."
+
     return jsonify({
+        "success": success,
+        "message": short_msg,
         "amount": amount,
         "time_taken": time_taken,
-        "name": name,
-        "email": email,
-        "message": message
+        "raw_message": message    # Remove this if you want less data
     })
 
 if __name__ == '__main__':
