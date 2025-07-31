@@ -129,20 +129,29 @@ def process():
     message = send_to_checkout(token, mm, yy, name, email, phone, address, city, state, postal)
     time_taken = round(time.time() - start_time, 3)
 
-    # --- Detect success or decline ---
-    if "Your Payment is Successfully Done" in message:
+    # For debugging, print full message to your logs
+    print("----RAW MESSAGE----")
+    print(message)
+    print("-------------------")
+
+    # --- Detect success or decline (decline first!) ---
+    if ("Payment was declined by Authorize.Net" in message or
+        "This transaction has been declined" in message):
+        success = False
+        short_msg = "This transaction has been declined."
+    elif "Your Payment is Successfully Done" in message:
         success = True
         short_msg = "Payment is Successfully Done."
     else:
         success = False
-        short_msg = "This transaction has been declined."
+        short_msg = "Unknown response, treat as declined."
 
     return jsonify({
         "success": success,
         "message": short_msg,
         "amount": amount,
         "time_taken": time_taken,
-        "raw_message": message    # Remove this if you want less data
+        "raw_message": message
     })
 
 if __name__ == '__main__':
